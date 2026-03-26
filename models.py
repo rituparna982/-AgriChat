@@ -2,16 +2,19 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
-# Schema for storing user/farmer data in MongoDB
+
 class FarmerSchema(BaseModel):
-    phone_number: str = Field(...)
-    language: str = Field(default="english")
+    telegram_id: int
+    name: str
+    location: Optional[str] = None
+    crop_type: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
-# Schema for logging chat queries
+
+
 class QuerySchema(BaseModel):
-    phone_number: str
-    query_text: str = Field(default="")
-    query_type: str # 'text', 'image', 'voice'
-    bot_response: str
+    farmer_id: int
+    message_text: Optional[str] = None
+    image_path: Optional[str] = None
+    disease_prediction: Optional[str] = None
+    ai_response: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
