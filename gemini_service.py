@@ -4,7 +4,7 @@ import pathlib
 
 # DAY 4: AI Intelligence Layer
 # Load your Gemini API Key
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your_gemini_api_key_here") # Set this in your local .env file
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your-api-key-here") # The key from prompt
 genai.configure(api_key=GEMINI_API_KEY)
 
 # Use Gemini 1.5 Flash (Supports Text + Audio + Images directly!)
