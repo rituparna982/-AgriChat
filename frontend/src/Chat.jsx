@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Mic, MessageCircle } from 'lucide-react';
+import { Send, Image as ImageIcon, Mic, MessageCircle, Bot, User } from 'lucide-react';
 import axios from 'axios';
+
+const API_BASE = 'http://127.0.0.1:8000';
 
 export default function Chat() {
   const [messages, setMessages] = useState([
-    { id: 1, sender: 'bot', text: 'Welcome to AgriChat AI 🌿 How can I help with your crops today?' }
+    { id: 1, sender: 'bot', text: '👋 Welcome to AgriChat AI 🌿\n\nI can help you with:\n🌿 Crop disease diagnosis\n📸 Send a crop photo for instant analysis\n💬 Type any farming question\n\nHow can I help with your crops today?' }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -17,48 +20,80 @@ export default function Chat() {
   const sendMessage = async () => {
     if (!input.trim()) return;
     
-    // Add user message to UI
-    const newUserMsg = { id: Date.now(), sender: 'user', text: input };
+    const userText = input.trim();
+    const newUserMsg = { id: Date.now(), sender: 'user', text: userText };
     setMessages(prev => [...prev, newUserMsg]);
     setInput('');
     setIsTyping(true);
 
-    // Send to FastAPI webhook (simulate WhatsApp)
     try {
-      const formData = new FormData();
-      formData.append('From', 'whatsapp:+19998887777');
-      formData.append('Body', newUserMsg.text);
-      formData.append('NumMedia', '0');
-
-      // Post to our local FastAPI webhook
-      const res = await axios.post('http://127.0.0.1:8000/webhook/', formData);
+      const res = await axios.post(`${API_BASE}/chat`, { message: userText });
       
-      // Simulate bot response for UI 
-      setTimeout(() => {
-        setIsTyping(false);
-        setMessages(prev => [
-            ...prev, 
-            { id: Date.now()+1, sender: 'bot', text: res.data.response || "No response received." }
-        ]);
-      }, 500);
-
+      setIsTyping(false);
+      setMessages(prev => [
+        ...prev, 
+        { id: Date.now()+1, sender: 'bot', text: res.data.response || "No response received." }
+      ]);
     } catch (e) {
       console.error(e);
       setIsTyping(false);
-      setMessages(prev => [...prev, { id: Date.now()+1, sender: 'bot', text: '⚠️ Connection error to FastAPI. Is it running on port 8000?' }]);
+      setMessages(prev => [...prev, { 
+        id: Date.now()+1, sender: 'bot', 
+        text: '⚠️ Connection error. Make sure the FastAPI backend is running on port 8000.' 
+      }]);
     }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Show user message with image preview
+    const imageUrl = URL.createObjectURL(file);
+    setMessages(prev => [...prev, { 
+      id: Date.now(), sender: 'user', 
+      text: `📸 Sent an image: ${file.name}`,
+      image: imageUrl
+    }]);
+    setIsTyping(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('message', 'Analyze this crop image');
+
+      const res = await axios.post(`${API_BASE}/chat/image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setIsTyping(false);
+      setMessages(prev => [
+        ...prev, 
+        { id: Date.now()+1, sender: 'bot', text: res.data.response || "Image analysis failed." }
+      ]);
+    } catch (e) {
+      console.error(e);
+      setIsTyping(false);
+      setMessages(prev => [...prev, { 
+        id: Date.now()+1, sender: 'bot', 
+        text: '⚠️ Failed to analyze image. Make sure the backend is running.' 
+      }]);
+    }
+
+    // Reset file input
+    e.target.value = '';
   };
 
   return (
     <div>
-      <h2>Farmer Chat Simulator</h2>
+      <h2>🤖 Telegram Bot Chat</h2>
       <p className="subtitle">
-        Simulates exactly what farmers experience on WhatsApp
+        Chat directly with the AgriChat AI — same intelligence that powers the Telegram bot
       </p>
 
       <div className="chat-container">
         <div className="chat-header">
-          <span className="title"><MessageCircle size={20} color="var(--primary)"/> WhatsApp Gateway</span>
+          <span className="title"><MessageCircle size={20} color="var(--primary)"/> AgriChat Telegram Bot</span>
           <span className="status-indicator">
             <span className="status-dot"></span> Server Connected
           </span>
@@ -67,7 +102,24 @@ export default function Chat() {
         <div className="chat-messages">
           {messages.map(msg => (
             <div key={msg.id} className={`message ${msg.sender === 'bot' ? 'msg-bot' : 'msg-user'}`}>
-              {msg.text}
+              {msg.image && (
+                <img 
+                  src={msg.image} 
+                  alt="Uploaded crop" 
+                  style={{
+                    maxWidth: '200px', 
+                    borderRadius: '12px', 
+                    marginBottom: '8px', 
+                    display: 'block'
+                  }} 
+                />
+              )}
+              {msg.text.split('\n').map((line, i) => (
+                <React.Fragment key={i}>
+                  {line}
+                  {i < msg.text.split('\n').length - 1 && <br />}
+                </React.Fragment>
+              ))}
             </div>
           ))}
           {isTyping && (
@@ -81,12 +133,24 @@ export default function Chat() {
         </div>
 
         <div className="chat-input-area">
-          <button className="icon-btn" title="Simulate Image Upload (Mock)"><ImageIcon size={22} /></button>
-          <button className="icon-btn" title="Simulate Voice Note (Mock)"><Mic size={22} /></button>
+          <input 
+            type="file" 
+            ref={fileInputRef}
+            accept="image/*" 
+            style={{display: 'none'}}
+            onChange={handleImageUpload}
+          />
+          <button 
+            className="icon-btn" 
+            title="Upload Crop Image for Analysis"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <ImageIcon size={22} />
+          </button>
           <input 
             type="text" 
             className="chat-input" 
-            placeholder="Type a message to the AI..." 
+            placeholder="Ask about crops, diseases, farming tips..." 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
